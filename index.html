@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Грибной атлас — справочник грибов</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gentium+Book+Plus:ital,wght@0,400;0,700;1,400&family=Old+Standard+TT:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+
+  <input type="checkbox" id="theme-toggle" class="theme-toggle">
+
+  <header class="site-header">
+    <p class="site-name">Грибной атлас</p>
+    <nav>
+      <ul class="nav-list">
+        <li><a href="#catalog">Каталог</a></li>
+        <li><a href="#search">Поиск</a></li>
+        <li><a href="#about">О проекте</a></li>
+      </ul>
+    </nav>
+    <label for="theme-toggle" class="theme-label">Лесная подстилка</label>
+  </header>
+
+  <main>
+    <h1>Справочник грибов средней полосы</h1>
+    <p class="lead">
+      <span class="dropcap">Г</span>рибной атлас помогает отличить съедобные виды от ядовитых:
+      у каждого гриба есть ботаническая таблица, семейство, сезон плодоношения
+      и отметка о съедобности. Задуман как энциклопедия, которая всегда под рукой.
+    </p>
+
+    <section id="catalog" aria-labelledby="catalog-title">
+      <h2 id="catalog-title">Каталог видов</h2>
+
+      <div class="cards">
+        <article class="card">
+          <figure>
+            <img src="assets/images/boletus-edulis.jpg" alt="Ботаническая таблица белого гриба: плодоножка в разрезе и споровый порошок">
+            <figcaption>Таб. I</figcaption>
+            <img class="photo" src="assets/images/boletus-photo.jpg" alt="Фотография белого гриба во мху под елью">
+          </figure>
+          <h3>Белый гриб</h3>
+          <p class="latin">Boletus edulis</p>
+          <p class="desc">Король леса: плотная белая мякоть, ореховый аромат. Растёт под елями, соснами и дубами.</p>
+          <dl class="props">
+            <div><dt>Семейство</dt><dd>Болетовые</dd></div>
+            <div><dt>Сезон</dt><dd>июнь — октябрь</dd></div>
+            <div><dt>Съедобность</dt><dd class="edible">съедобный</dd></div>
+          </dl>
+        </article>
+
+        <article class="card">
+          <figure>
+            <img src="assets/images/chanterelle.jpg" alt="Ботаническая таблица лисички обыкновенной: группа жёлтых воронковидных грибов">
+            <figcaption>Таб. II</figcaption>
+            <img class="photo" src="assets/images/chanterelle-photo.jpg" alt="Фотография группы жёлтых лисичек во мху">
+          </figure>
+          <h3>Лисичка обыкновенная</h3>
+          <p class="latin">Cantharellus cibarius</p>
+          <p class="desc">Ярко-жёлтая воронка с фруктовым запахом. Почти не бывает червивой — мякоть не по вкусу личинкам.</p>
+          <dl class="props">
+            <div><dt>Семейство</dt><dd>Лисичковые</dd></div>
+            <div><dt>Сезон</dt><dd>июнь — ноябрь</dd></div>
+            <div><dt>Съедобность</dt><dd class="edible">съедобный</dd></div>
+          </dl>
+        </article>
+
+        <article class="card">
+          <figure>
+            <img src="assets/images/leccinum.jpg" alt="Ботаническая таблица подосиновика: оранжево-красная шляпка и ножка с тёмными чешуйками">
+            <figcaption>Таб. III</figcaption>
+            <img class="photo" src="assets/images/leccinum-photo.jpg" alt="Фотография подосиновика у ствола берёзы">
+          </figure>
+          <h3>Подосиновик</h3>
+          <p class="latin">Leccinum aurantiacum</p>
+          <p class="desc">Огненно-рыжая шляпка и ножка в тёмных чешуйках. Верный спутник молодых осинников.</p>
+          <dl class="props">
+            <div><dt>Семейство</dt><dd>Болетовые</dd></div>
+            <div><dt>Сезон</dt><dd>июль — октябрь</dd></div>
+            <div><dt>Съедобность</dt><dd class="edible">съедобный</dd></div>
+          </dl>
+        </article>
+
+        <article class="card">
+          <figure>
+            <img src="assets/images/muscaria.jpg" alt="Ботаническая таблица мухомора красного: алая шляпка в белых бородавках, взрослый гриб и разрез">
+            <img class="photo" src="assets/images/muscaria-photo.jpg" alt="Фотография красного мухомора среди папоротников">
+            <figcaption>Таб. IV</figcaption>
+          </figure>
+          <h3>Мухомор красный</h3>
+          <p class="latin">Amanita muscaria</p>
+          <p class="desc">Самый узнаваемый гриб мира. Красив, но токсичен: вызывает отравления и галлюцинации.</p>
+          <dl class="props">
+            <div><dt>Семейство</dt><dd>Аманитовые</dd></div>
+            <div><dt>Сезон</dt><dd>август — ноябрь</dd></div>
+            <div><dt>Съедобность</dt><dd class="poisonous">ядовитый</dd></div>
+          </dl>
+        </article>
+
+        <article class="card">
+          <figure>
+            <img src="assets/images/phalloides.jpg" alt="Ботаническая таблица бледной поганки: бледно-зелёная шляпка, белые пластинки и вольва у основания">
+            <figcaption>Таб. V</figcaption>
+            <img class="photo" src="assets/images/phalloides-photo.jpg" alt="Фотография бледной поганки в дубовом лесу">
+          </figure>
+          <h3>Бледная поганка</h3>
+          <p class="latin">Amanita phalloides</p>
+          <p class="desc">Самый опасный гриб наших лесов. Даже небольшой кусочек смертельно поражает печень.</p>
+          <dl class="props">
+            <div><dt>Семейство</dt><dd>Аманитовые</dd></div>
+            <div><dt>Сезон</dt><dd>июль — октябрь</dd></div>
+            <div><dt>Съедобность</dt><dd class="poisonous">смертельно ядовитый</dd></div>
+          </dl>
+        </article>
+
+        <article class="card">
+          <figure>
+            <img src="assets/images/satanas.jpg" alt="Ботаническая таблица сатанинского гриба: серая шляпка, массивная жёлто-красная ножка">
+            <figcaption>Таб. VI</figcaption>
+            <img class="photo" src="assets/images/satanas-photo.jpg" alt="Фотография сатанинского гриба в лесной подстилке">
+          </figure>
+          <h3>Сатанинский гриб</h3>
+          <p class="latin">Rubroboletus satanas</p>
+          <p class="desc">Массивный двойник белого. Мякоть на срезе синеет — верный признак опасного вида.</p>
+          <dl class="props">
+            <div><dt>Семейство</dt><dd>Болетовые</dd></div>
+            <div><dt>Сезон</dt><dd>июнь — сентябрь</dd></div>
+            <div><dt>Съедобность</dt><dd class="poisonous">ядовитый</dd></div>
+          </dl>
+        </article>
+      </div>
+    </section>
+
+    <section id="search" aria-labelledby="search-title">
+      <h2 id="search-title">Найти гриб</h2>
+      <form class="search-form" action="#catalog" method="get">
+        <div class="field">
+          <label for="query">Название или латинское имя</label>
+          <input type="search" id="query" name="query" placeholder="например, лисичка">
+        </div>
+        <div class="field">
+          <label for="category">Категория</label>
+          <select id="category" name="category">
+            <option value="all">все</option>
+            <option value="edible">съедобные</option>
+            <option value="poisonous">ядовитые</option>
+          </select>
+        </div>
+        <button type="submit">Искать</button>
+      </form>
+      <p class="hint">Поиск заработает в следующих лабораторных — пока форма лишь показывает будущий интерфейс.</p>
+    </section>
+
+    <section id="about" aria-labelledby="about-title">
+      <h2 id="about-title">Как пользоваться атласом</h2>
+      <p>
+        Начните с таблицы: сравните шляпку, ножку и мякоть найденного гриба с гравюрой.
+        Затем проверьте семейство и сезон — съедобные виды редко растут не в свой срок.
+        Золотое правило грибника простое: если сомневаешься хотя бы в одном признаке —
+        гриб остаётся в лесу.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <p>Грибной атлас · учебный проект</p>
+    <p>Иллюстрации выполнены в стиле ботанических таблиц XIX века · 2025</p>
+  </footer>
+
+</body>
+</html>
