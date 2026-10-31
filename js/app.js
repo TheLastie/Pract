@@ -1,7 +1,6 @@
 'use strict';
 
 (() => {
-  const STORAGE_KEY = 'gribnoy-atlas:items:v1';
   const categories = { edible: 'съедобный', poisonous: 'ядовитый', unknown: 'не определено' };
   const cards = document.querySelector('#cards');
   const query = document.querySelector('#query');
@@ -11,74 +10,63 @@
   const form = document.querySelector('#item-form');
   const fields = [...form.querySelectorAll('input, select, textarea')];
   let submitted = false;
-
-  // Начальные данные берём из карточек исходной ЛР №1, затем DOM строится из state.
-  const defaultItems = [...cards.querySelectorAll('.card')].map((card, index) => {
-    const values = [...card.querySelectorAll('dd')];
-    return {
-      id: `default-${index + 1}`,
-      name: card.querySelector('h3').textContent,
-      latin: card.querySelector('.latin').textContent,
-      description: card.querySelector('.desc').textContent,
-      family: values[0].textContent,
-      season: values[1].textContent,
-      category: values[2].classList.contains('edible') ? 'edible' : 'poisonous',
-      edibility: values[2].textContent,
-      illustration: card.querySelector('img').getAttribute('src'),
-      photo: card.querySelector('.photo').getAttribute('src'),
-      plate: card.querySelector('figcaption').textContent,
-      createdAt: index + 1
-    };
-  });
-  const assets = new Set(defaultItems.flatMap(item => [item.illustration, item.photo]));
+  let editingId = null;
 
   const state = {
     items: [],
     searchQuery: '',
     selectedCategory: 'all',
     sortBy: 'name-asc',
-    storageMessage: ''
+    apiMessage: '',
+    loading: true,
+    loadFailed: false
   };
 
-  function isStoredItem(item) {
-    if (!item || typeof item !== 'object') return false;
-    const limits = { id: [1, 100], name: [2, 100], latin: [0, 120], family: [2, 100], season: [3, 100], description: [10, 700] };
-    return Object.entries(limits).every(([key, [min, max]]) =>
-      typeof item[key] === 'string' && item[key].trim().length >= min && item[key].length <= max
-    ) && Object.hasOwn(categories, item.category)
-      && Number.isFinite(item.createdAt)
-      && (item.illustration === undefined || assets.has(item.illustration))
-      && (item.photo === undefined || assets.has(item.photo))
-      && (item.plate === undefined || (typeof item.plate === 'string' && item.plate.length < 30))
-      && (item.edibility === undefined || (typeof item.edibility === 'string' && item.edibility.length < 50));
+  async function apiRequest(path, { method = 'GET', data, body: rawBody } = {}) {
+    const options = { method, headers: {} };
+    if (rawBody !== undefined) {
+      options.headers['Content-Type'] = rawBody.type || 'application/octet-stream';
+      options.body = rawBody;
+    } else if (data !== undefined) {
+      options.headers['Content-Type'] = 'application/json';
+      options.body = JSON.stringify(data);
+    }
+    const response = await fetch(path, options);
+    if (response.status === 204) return null;
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      const details = Array.isArray(body?.detail)
+        ? body.detail.map(error => `${error.loc?.at(-1) || 'Поле'}: ${error.msg}`).join('. ')
+        : body?.detail;
+      throw new Error(details || `Ошибка сервера: ${response.status}`);
+    }
+    return body;
   }
 
-  function loadItems() {
+  function showApiError(error, action) {
+    state.apiMessage = `${action}: ${error.message}`;
+    render();
+  }
+
+  async function loadItems() {
+    state.loading = true;
+    state.apiMessage = '';
+    state.loadFailed = false;
+    render();
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === null) return defaultItems.map(item => ({ ...item }));
-      const items = JSON.parse(stored);
-      if (!Array.isArray(items) || !items.every(isStoredItem)
-        || new Set(items.map(item => item.id)).size !== items.length) {
-        throw new Error('Invalid saved data');
-      }
-      return items; // Пустой массив сохраняет намеренно очищенный каталог.
-    } catch {
-      state.storageMessage = 'Сохранённые записи недоступны или повреждены. Показан исходный атлас. При следующем добавлении или удалении попробуем сохранить изменения.';
-      return defaultItems.map(item => ({ ...item }));
+      state.items = await apiRequest('/api/mushrooms');
+    } catch (error) {
+      state.items = [];
+      state.loadFailed = true;
+      state.apiMessage = error instanceof TypeError
+        ? 'Не удалось связаться с API. Запустите FastAPI и откройте сайт по адресу http://127.0.0.1:8000.'
+        : `Не удалось загрузить каталог: ${error.message}`;
+    } finally {
+      state.loading = false;
+      render();
     }
   }
 
-  function saveItems() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
-      state.storageMessage = '';
-    } catch {
-      state.storageMessage = 'Браузер не позволил сохранить изменения. Записи доступны на этой странице, но изменения могут потеряться после перезагрузки.';
-    }
-  }
-
-  // Пользовательский текст никогда не интерпретируется как HTML.
   function element(tag, className, text) {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -95,35 +83,45 @@
       image.alt = `Ботаническая таблица: ${item.name}`;
       image.loading = 'lazy';
       figure.append(image, element('figcaption', '', item.plate || 'Ботаническая таблица'));
-      if (item.photo) {
-        const photo = element('img', 'photo');
-        photo.src = item.photo;
-        photo.alt = `Полевой снимок: ${item.name}`;
-        photo.loading = 'lazy';
-        figure.append(photo);
-      }
     } else {
       figure.classList.add('field-note');
       figure.append(element('span', 'note-symbol', '❦'), element('figcaption', '', 'Полевая запись · без иллюстрации'));
     }
+    for (const [index, src] of [item.photo, item.photo2].entries()) {
+      if (!src) continue;
+      const photo = element('img', 'photo');
+      photo.src = src;
+      photo.alt = `Полевой снимок${index ? ' 2' : ''}: ${item.name}`;
+      photo.loading = 'lazy';
+      figure.append(photo);
+    }
     card.append(figure, element('h3', '', item.name));
     if (item.latin) card.append(element('p', 'latin', item.latin));
     card.append(element('p', 'desc', item.description));
+
     const props = element('dl', 'props');
     for (const [label, value, className] of [
       ['Семейство', item.family, ''],
       ['Сезон', item.season, ''],
-      ['Съедобность', item.edibility || categories[item.category], item.category]
+      ['Съедобность', categories[item.category], item.category]
     ]) {
       const row = element('div');
       row.append(element('dt', '', label), element('dd', className, value));
       props.append(row);
     }
+    card.append(props);
+
+    const actions = element('div', 'card-actions');
+    const edit = element('button', 'secondary', 'Изменить');
+    edit.type = 'button';
+    edit.dataset.editId = String(item.id);
+    edit.setAttribute('aria-label', `Изменить: ${item.name}`);
     const remove = element('button', 'delete-button secondary', 'Удалить');
     remove.type = 'button';
-    remove.dataset.deleteId = item.id;
+    remove.dataset.deleteId = String(item.id);
     remove.setAttribute('aria-label', `Удалить: ${item.name}`);
-    card.append(props, remove);
+    actions.append(edit, remove);
+    card.append(actions);
     return card;
   }
 
@@ -131,12 +129,14 @@
     const needle = state.searchQuery.trim().toLocaleLowerCase('ru');
     const filtered = state.items.filter(item =>
       (state.selectedCategory === 'all' || item.category === state.selectedCategory)
-      && [item.name, item.latin, item.description, item.family, item.season]
+      && [item.name, item.latin || '', item.description, item.family, item.season]
         .some(value => value.toLocaleLowerCase('ru').includes(needle))
     );
+    // Сохранённые диагностические сообщения из пользовательских изменений.
+    console.log(filtered);
     return [...filtered].sort((a, b) => {
-      if (state.sortBy === 'newest') return b.createdAt - a.createdAt;
-      if (state.sortBy === 'oldest') return a.createdAt - b.createdAt;
+      if (state.sortBy === 'newest') return Date.parse(b.created_at) - Date.parse(a.created_at);
+      if (state.sortBy === 'oldest') return Date.parse(a.created_at) - Date.parse(b.created_at);
       const order = a.name.localeCompare(b.name, 'ru');
       return state.sortBy === 'name-desc' ? -order : order;
     });
@@ -146,6 +146,7 @@
   const emptyTitle = element('h3');
   const emptyDescription = element('p');
   const emptyAction = element('button', 'secondary');
+  emptyAction.id = 'empty-action';
   emptyAction.type = 'button';
   empty.append(emptyTitle, emptyDescription, emptyAction);
   cards.after(empty);
@@ -158,17 +159,21 @@
     query.value = state.searchQuery;
     category.value = state.selectedCategory;
     sort.value = state.sortBy;
-    document.querySelector('#result-count').textContent = `Показано ${items.length} из ${state.items.length}`;
-    empty.hidden = items.length > 0;
+    document.querySelector('#result-count').textContent = state.loading
+      ? 'Загружаем каталог…'
+      : state.loadFailed
+        ? 'Каталог недоступен'
+        : `Показано ${items.length} из ${state.items.length}`;
+    empty.hidden = state.loading || state.loadFailed || items.length > 0;
     const isEmptyAtlas = state.items.length === 0;
     emptyTitle.textContent = isEmptyAtlas ? 'В атласе пока нет записей' : 'Ничего не найдено';
     emptyDescription.textContent = isEmptyAtlas
       ? 'Добавьте первое наблюдение, чтобы начать свою коллекцию.'
       : 'Попробуйте другое название или сбросьте условия поиска.';
     emptyAction.textContent = isEmptyAtlas ? 'Добавить гриб' : 'Сбросить поиск';
-    const message = document.querySelector('#storage-message');
-    message.textContent = state.storageMessage;
-    message.hidden = !state.storageMessage;
+    const message = document.querySelector('#api-message');
+    document.querySelector('#api-error-text').textContent = state.apiMessage;
+    message.hidden = !state.apiMessage;
   }
 
   function resetFilters() {
@@ -178,14 +183,25 @@
     render();
   }
 
-  function openDialog() {
+  function openDialog(item = null) {
     form.reset();
     submitted = false;
+    editingId = item?.id ?? null;
     fields.forEach(field => {
       field.removeAttribute('aria-invalid');
       document.querySelector(`#${field.name}-error`).textContent = '';
     });
-    dialog.showModal(); // Нативный dialog удерживает фокус и обрабатывает Escape.
+    const formError = document.querySelector('#form-api-error');
+    formError.textContent = '';
+    formError.hidden = true;
+    document.querySelector('#dialog-title').textContent = item ? 'Изменить запись' : 'Добавить гриб';
+    document.querySelector('#submit-item').textContent = item ? 'Сохранить изменения' : 'Добавить в атлас';
+    document.querySelector('#dialog-description').textContent = 'Запишите наблюдение. Обязательные поля отмечены звёздочкой.';
+    if (item) {
+      for (const field of fields) field.value = item[field.name] ?? '';
+    }
+    dialog.showModal();
+    fields[0].focus();
   }
 
   function validateField(field) {
@@ -211,14 +227,15 @@
   sort.addEventListener('change', () => { state.sortBy = sort.value; render(); });
   document.querySelector('.search-form').addEventListener('submit', event => event.preventDefault());
   document.querySelector('#reset-filters').addEventListener('click', resetFilters);
-  emptyAction.addEventListener('click', () => {
+  document.querySelector('#empty-action').addEventListener('click', () => {
     if (state.items.length === 0) openDialog();
     else { resetFilters(); query.focus(); }
   });
-  document.querySelector('#add-item').addEventListener('click', openDialog);
+  document.querySelector('#add-item').addEventListener('click', () => openDialog());
+  document.querySelector('#retry-load').addEventListener('click', loadItems);
   document.querySelector('#close-dialog').addEventListener('click', () => dialog.close());
   document.querySelector('#cancel-dialog').addEventListener('click', () => dialog.close());
-  // Выделение текста за границу окна не должно закрывать форму.
+
   let pointerStartedOutside = false;
   function outsideDialog(event) {
     const rect = dialog.getBoundingClientRect();
@@ -235,7 +252,8 @@
       if (submitted && fields.includes(event.target)) validateField(event.target);
     });
   }
-  form.addEventListener('submit', event => {
+
+  form.addEventListener('submit', async event => {
     event.preventDefault();
     submitted = true;
     const valid = fields.map(validateField).every(Boolean);
@@ -244,39 +262,84 @@
       return;
     }
     const values = Object.fromEntries(new FormData(form));
-    const item = {
-      id: crypto.randomUUID(),
-      name: values.name.trim(), latin: values.latin.trim(),
+    const data = {
+      name: values.name.trim(), latin: values.latin.trim() || null,
       family: values.family.trim(), season: values.season.trim(),
-      category: values.category, description: values.description.trim(), createdAt: Date.now()
+      category: values.category, description: values.description.trim()
     };
-    state.items = [...state.items, item];
-    saveItems();
-    // Снимаем фильтры, чтобы добавленная запись сразу стала видна.
-    state.searchQuery = '';
-    state.selectedCategory = 'all';
-    state.sortBy = 'newest';
-    render();
-    dialog.close();
-    document.querySelector('#announcement').textContent = `Добавлена запись: ${item.name}`;
+    const photos = [
+      { slot: 1, file: form.elements.namedItem('photo_file').files[0] },
+      { slot: 2, file: form.elements.namedItem('photo_file_2').files[0] }
+    ].filter(photo => photo.file);
+    for (const { file } of photos) {
+      let message = '';
+      if (file.size > 5 * 1024 * 1024) message = 'Фото должно быть не больше 5 МБ.';
+      else if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) message = 'Поддерживаются фото JPEG, PNG, GIF и WebP.';
+      if (message) {
+        const error = document.querySelector('#form-api-error');
+        error.textContent = message;
+        error.hidden = false;
+        return;
+      }
+    }
+    const editing = editingId !== null;
+    const savedName = data.name;
+    const path = editing ? `/api/mushrooms/${editingId}` : '/api/mushrooms';
+    try {
+      let savedItem = await apiRequest(path, { method: editing ? 'PATCH' : 'POST', data });
+      for (const { slot, file } of photos) {
+        savedItem = await apiRequest(`/api/mushrooms/${savedItem.id}/photo?slot=${slot}`, { method: 'PUT', body: file });
+      }
+      state.items = editing
+        ? state.items.map(item => item.id === editingId ? savedItem : item)
+        : [...state.items, savedItem];
+      state.apiMessage = '';
+      if (!editing) {
+        state.searchQuery = '';
+        state.selectedCategory = 'all';
+        state.sortBy = 'newest';
+      }
+      render();
+      dialog.close();
+      document.querySelector('#announcement').textContent = editing
+        ? `Изменена запись: ${savedName}`
+        : `Добавлена запись: ${savedName}`;
+    } catch (error) {
+      const formError = document.querySelector('#form-api-error');
+      formError.textContent = error.message;
+      formError.hidden = false;
+      showApiError(error, editing ? 'Не удалось изменить запись' : 'Не удалось добавить запись');
+    }
   });
 
-  // Один обработчик на весь каталог, включая новые карточки.
-  cards.addEventListener('click', event => {
+  // Один слушатель обслуживает карточки каталога и кнопки в них.
+  cards.addEventListener('click', async event => {
+    const editButton = event.target.closest('button[data-edit-id]');
+    if (editButton && cards.contains(editButton)) {
+      const item = state.items.find(entry => String(entry.id) === editButton.dataset.editId);
+      if (item) openDialog(item);
+      return;
+    }
     const button = event.target.closest('button[data-delete-id]');
     if (!button || !cards.contains(button)) return;
-    const item = state.items.find(entry => entry.id === button.dataset.deleteId);
+    const item = state.items.find(entry => String(entry.id) === button.dataset.deleteId);
     if (!item) return;
-    const buttons = [...cards.querySelectorAll('[data-delete-id]')];
-    const index = buttons.indexOf(button);
-    state.items = state.items.filter(entry => entry.id !== item.id);
-    saveItems();
-    render();
-    const remaining = cards.querySelectorAll('[data-delete-id]');
-    (remaining[Math.min(index, remaining.length - 1)] || emptyAction).focus();
-    document.querySelector('#announcement').textContent = `Удалена запись: ${item.name}`;
+    button.disabled = true;
+    try {
+      await apiRequest(`/api/mushrooms/${item.id}`, { method: 'DELETE' });
+      const buttons = [...cards.querySelectorAll('[data-delete-id]')];
+      const index = buttons.indexOf(button);
+      state.items = state.items.filter(entry => entry.id !== item.id);
+      state.apiMessage = '';
+      render();
+      const remaining = cards.querySelectorAll('[data-delete-id]');
+      (remaining[Math.min(index, remaining.length - 1)] || document.querySelector('#empty-action')).focus();
+      document.querySelector('#announcement').textContent = `Удалена запись: ${item.name}`;
+    } catch (error) {
+      button.disabled = false;
+      showApiError(error, 'Не удалось удалить запись');
+    }
   });
 
-  state.items = loadItems();
-  render();
+  loadItems();
 })();

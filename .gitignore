@@ -1,1 +1,6 @@
 .playwright-cli/
+__pycache__/
+*.py[cod]
+.venv/
+.env
+backend/data/*.db
