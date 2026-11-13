@@ -1,0 +1,27 @@
+# CI/CD: runner (shell executor) стоит на ВМ с Ubuntu, где уже есть Docker.
+# Пайплайн запускается при каждом коммите в главную ветку.
+stages:
+  - build
+  - deploy
+
+build:
+  stage: build
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - docker compose config --quiet
+    - docker compose build
+
+deploy:
+  stage: deploy
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    # Docker-плагин для отправки логов в Loki (ставится один раз)
+    - docker plugin ls --format '{{.Name}}' | grep -q '^loki:' || docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
+    # запуск и ожидание, пока healthcheck всех контейнеров станет healthy
+    - docker compose up -d --remove-orphans --wait --wait-timeout 180
+    - docker compose ps
+    # проверка снаружи: сайт и API отвечают
+    - curl -fsS http://localhost:8080/ > /dev/null
+    - curl -fsS http://localhost:8080/api/mushrooms > /dev/null

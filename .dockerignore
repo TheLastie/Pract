@@ -1,0 +1,15 @@
+.git
+.idea
+.omx
+.playwright-cli
+.venv
+__pycache__
+*.pyc
+.env
+data
+backend/data
+mira
+tests
+screenshots
+screenshot*.png
+*.md

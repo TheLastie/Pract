@@ -70,6 +70,59 @@ python -m uvicorn backend.app.main:app --reload
 
 По умолчанию используется SQLite. Для PostgreSQL задайте переменную окружения `DATABASE_URL`, например `postgresql+psycopg://user:password@localhost/mushrooms`, установите драйвер `psycopg` и укажите соответствующий URL перед запуском. Секреты и `.env` в Git не добавляются.
 
+### Docker, логи и CI/CD
+
+Запуск в Docker (front, api, worker, Loki, Grafana) и настройка GitLab CI/CD описаны в [DEPLOY.md](DEPLOY.md). Коротко:
+
+```bash
+docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
+docker compose up -d --build
+```
+
+Сайт — <http://localhost:8080>, логи в Grafana — <http://localhost:3000>.
+
+## Отчёт по заданию DevOps (Docker, Loki + Grafana, GitLab CI/CD)
+
+Задание: поднять проект через `docker compose` с контейнерами `front`, `api`, `worker`, настроить healthcheck, собирать логи в Loki + Grafana через Docker-плагин (вместо promtail) и сделать CI/CD pipeline для GitLab с запуском на ВМ.
+
+### Что сделано
+
+| Требование | Реализация |
+|---|---|
+| Контейнеры front, api, worker | `docker-compose.yml`; `front` — nginx со статикой и прокси `/api`, `api` — FastAPI, `worker` — `backend/app/worker.py` (тот же образ `backend/Dockerfile`) |
+| Healthcheck api и worker (`GET /healthcheck` = 200) | маршрут `/healthcheck` в `backend/app/main.py` и мини-сервер в воркере на порту 5000; проверки описаны в `docker-compose.yml` |
+| Логи через Loki и Grafana, promtail заменён плагином Docker driver | `logging: driver: loki` у контейнеров приложения, `loki/config.yaml`, источник данных Grafana в `grafana/provisioning/` |
+| Вся инфраструктура в репозитории | `docker-compose.yml`, три Dockerfile/конфига, `loki/`, `grafana/`, `.gitlab-ci.yml`, `.dockerignore` |
+| Документация по запуску | [DEPLOY.md](DEPLOY.md) |
+| CI/CD: сборка и запуск на ВМ с логированием | `.gitlab-ci.yml`: этап `build` (`docker compose build`) и этап `deploy` (плагин loki, `docker compose up -d --wait`, проверка `curl`) |
+
+Воркер раз в минуту обходит таблицу грибов пачками по 500 строк и ищет записи, у которых есть ссылка на загруженное фото, а файла в базе нет. Итог пишется в лог, его видно в Grafana.
+
+### Что проверено
+
+Docker на машине, где выполнялась работа, не установлен, поэтому **контейнеры не запускались, ВМ и GitLab runner не создавались**. Проверено вне Docker, тем же кодом, что попадёт в образы:
+
+- сервер FastAPI запущен командой `python -m uvicorn backend.app.main:app`, сайт и Swagger открываются;
+- `GET /healthcheck` у API и воркера возвращает 200;
+- воркер работает и пишет в лог результат проверки базы;
+- файлы `docker-compose.yml`, `.gitlab-ci.yml`, `loki/config.yaml` и конфиг Grafana читаются как корректный YAML; тесты API (`python -m unittest discover -s backend/tests`) проходят.
+
+Не проверены: сборка образов, nginx-прокси, запись логов в Loki, pipeline в GitLab. Эти шаги выполняются по [DEPLOY.md](DEPLOY.md).
+
+### Скриншоты
+
+Сайт, запущенный локально без Docker, с данными из API:
+
+![Сайт](screenshots/devops-site.png)
+
+Swagger UI:
+
+![Swagger](screenshots/devops-swagger.png)
+
+Healthcheck API и воркера и лог воркера (текст собран из реального вывода команд):
+
+![Healthcheck и лог воркера](screenshots/devops-worker-health.png)
+
 ## Проверка API
 
 Из корня проекта выполните:

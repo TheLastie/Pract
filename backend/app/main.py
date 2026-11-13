@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import LargeBinary, inspect
+from sqlalchemy import LargeBinary, inspect, text
 
 from .database import Base, SessionLocal, engine
 from .routers.mushrooms import router as mushrooms_router
@@ -65,6 +65,14 @@ def redoc_docs():
         redoc_favicon_url="data:,",
         with_google_fonts=False,
     )
+
+
+@app.get("/healthcheck", include_in_schema=False)
+def healthcheck() -> dict[str, str]:
+    """Для Docker: 200, если API работает и база отвечает."""
+    with SessionLocal() as db:
+        db.execute(text("SELECT 1"))
+    return {"status": "ok"}
 
 
 @app.get("/", include_in_schema=False)

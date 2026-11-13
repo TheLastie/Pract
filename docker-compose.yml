@@ -1,0 +1,94 @@
+# Запуск: docker compose up -d --build   (подробности в DEPLOY.md)
+# Логи контейнеров уходят в Loki через Docker-плагин "loki" (promtail не нужен).
+# Плагин нужно один раз поставить на машину:
+#   docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
+
+x-logging: &logging
+  driver: loki
+  options:
+    loki-url: "http://localhost:3100/loki/api/v1/push"   # плагин работает на хосте, поэтому localhost
+    loki-batch-size: "100"
+    loki-retries: "2"
+    loki-timeout: 1s
+    loki-max-backoff: 1s
+    mode: non-blocking   # если Loki недоступен, контейнеры всё равно стартуют
+
+x-backend-build: &backend-build
+  context: .
+  dockerfile: backend/Dockerfile
+
+services:
+  front:
+    build:
+      context: .
+      dockerfile: front/Dockerfile
+    image: mushroom-front
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+
+  api:
+    build: *backend-build
+    image: mushroom-backend
+    environment:
+      DATABASE_URL: sqlite:////data/mushrooms.db
+    volumes:
+      - mushrooms-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthcheck')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+
+  worker:
+    build: *backend-build
+    image: mushroom-backend
+    command: ["python", "-m", "backend.app.worker"]
+    environment:
+      DATABASE_URL: sqlite:////data/mushrooms.db
+    volumes:
+      - mushrooms-data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/healthcheck')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+
+  loki:
+    image: grafana/loki:3.0.0
+    command: ["-config.file=/etc/loki/config.yaml"]
+    volumes:
+      - ./loki/config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "127.0.0.1:3100:3100"   # нужен плагину на хосте; наружу не открыт
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - loki
+
+volumes:
+  mushrooms-data:
+  loki-data:
+  grafana-data:
