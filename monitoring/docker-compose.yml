@@ -1,0 +1,47 @@
+# Стек мониторинга: webapp (nginx) -> cAdvisor -> Prometheus -> Grafana
+services:
+  webapp:
+    image: nginx:alpine
+    container_name: webapp
+    ports:
+      - "80:80"
+    volumes:                      # статический сайт грибного атласа из папки выше
+      - ../index.html:/usr/share/nginx/html/index.html:ro
+      - ../css:/usr/share/nginx/html/css:ro
+      - ../js:/usr/share/nginx/html/js:ro
+      - ../assets:/usr/share/nginx/html/assets:ro
+    networks: [monitoring]
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.53.0
+    container_name: cadvisor
+    ports:
+      - "8080:8080"
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks: [monitoring]
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on: [cadvisor]
+    networks: [monitoring]
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus]
+    networks: [monitoring]
+
+networks:
+  monitoring:

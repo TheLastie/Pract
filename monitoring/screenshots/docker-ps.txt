@@ -1,0 +1,4 @@
+grafana	Up 14 minutes
+prometheus	Up 14 minutes
+webapp	Up 14 minutes
+cadvisor	Up 14 minutes (healthy)
